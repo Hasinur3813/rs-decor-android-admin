@@ -1,0 +1,31 @@
+{
+  "name": "rs-decor-admin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RS Decor admin panel — manage Android catalog via Firestore + Cloudinary",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "gen-password": "node scripts/gen-password.mjs"
+  },
+  "dependencies": {
+    "cloudinary": "^2.5.1",
+    "firebase-admin": "^12.7.0",
+    "next": "^14.2.35",
+    "next-auth": "^4.24.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2"
+  }
+}

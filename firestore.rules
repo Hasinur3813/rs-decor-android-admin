@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidCategory(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+             data.slug is string && data.slug.size() <= 64 &&
+             data.imageUrl is string && data.imageUrl.size() <= 1000;
+    }
+
+    function isValidDesign(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 150 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.subcategory is string && data.subcategory.size() <= 100 &&
+             data.imageUrl is string && data.imageUrl.size() <= 1000;
+    }
+
+    function isValidSubcategory(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+             data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 64;
+    }
+
+    function isValidAppSettings(data) {
+      return data.phoneNumber is string && data.phoneNumber.size() >= 8 && data.phoneNumber.size() <= 24 &&
+             data.whatsappNumber is string && data.whatsappNumber.size() >= 8 && data.whatsappNumber.size() <= 24 &&
+             data.heroTitle is string && data.heroTitle.size() <= 200 &&
+             data.heroImageUrl is string && data.heroImageUrl.size() <= 1000;
+    }
+
+    // Public Showcase Categories
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isValidCategory(incoming());
+    }
+
+    // Public Showcase Designs
+    match /designs/{designId} {
+      allow read: if true;
+      allow write: if isValidDesign(incoming());
+    }
+
+    // Room Subcategories (admin-managed, bundled fallback in app)
+    match /subcategories/{subcategoryId} {
+      allow read: if true;
+      allow write: if isValidSubcategory(incoming());
+    }
+
+     // Contact numbers + hero banner (single doc: settings/app, public read)
+    match /settings/app {
+      allow read: if true;
+      allow write: if isValidAppSettings(incoming());
+    }
+
+    // All other settings docs (e.g. settings/integrations holding API
+    // secrets) are Admin-SDK-only: no client access of any kind.
+    match /settings/{settingId} {
+      allow read, write: if false;
+    }
+  }
+}
