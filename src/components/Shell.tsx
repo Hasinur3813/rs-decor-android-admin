@@ -8,7 +8,7 @@ import { useToast } from "./Toast";
 
 const NAV = [
   { href: "/", label: "Overview", icon: "grid" },
-  { href: "/designs", label: "Design library", icon: "image" },
+  { href: "/designs", label: "Design library", icon: "image", matchChildren: true },
   { href: "/categories", label: "Categories", icon: "layers" },
   { href: "/subcategories", label: "Rooms", icon: "room" },
   { href: "/settings/integrations", label: "Integrations", icon: "cloud" },
@@ -202,8 +202,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function NavLink({ n, pathname, onNavigate }: { n: { href: string; label: string; icon: string }; pathname: string; onNavigate: () => void }) {
-  const active = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/");
+function NavLink({ n, pathname, onNavigate }: { n: { href: string; label: string; icon: string; matchChildren?: boolean }; pathname: string; onNavigate: () => void }) {
+  const active = pathname === n.href || Boolean(n.matchChildren && pathname.startsWith(n.href + "/"));
   return (
     <Link href={n.href} onClick={onNavigate}
       className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] font-semibold transition-all ${active

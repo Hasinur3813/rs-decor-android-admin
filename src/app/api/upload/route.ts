@@ -10,8 +10,8 @@ const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp", "avif", "heic", "heif", "jfi
 const MAX_BYTES = 12 * 1024 * 1024;
 
 /**
- * POST /api/upload — multipart form: file (required), kind (designs|categories|hero), publicId?
- * Uploads server-side to Cloudinary, returns { secure_url, public_id, ... }.
+ * POST /api/upload — legacy server-proxy multipart upload (12 MB max).
+ * New browser uploads use /api/upload/signature and send bytes directly to Cloudinary.
  */
 export async function POST(req: Request) {
   try {

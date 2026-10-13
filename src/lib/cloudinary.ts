@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import { randomUUID } from "node:crypto";
 import { adminDb } from "./firebaseAdmin";
 
 export type CloudinaryCreds = {
@@ -100,6 +101,30 @@ export async function uploadFolder(kind: string): Promise<string> {
   const creds = await getCloudinaryCreds();
   const base = (creds.folder || "rs-decor").replace(/\/+$/, "");
   return `${base}/${kind}`;
+}
+
+export async function createDirectUploadSignature(kind: string) {
+  const creds = await getCloudinaryCreds();
+  if (creds.missing.length > 0) {
+    throw new Error(`Cloudinary is not configured (missing: ${creds.missing.join(", ")}). Set it in Integrations or .env.`);
+  }
+
+  const folder = `${(creds.folder || "rs-decor").replace(/\/+$/, "")}/${kind}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const publicId = randomUUID();
+  const params = { folder, overwrite: true, public_id: publicId, timestamp };
+  const client = await cloudinaryClient();
+  const signature = client.utils.api_sign_request(params, creds.apiSecret);
+
+  return {
+    cloudName: creds.cloudName,
+    apiKey: creds.apiKey,
+    folder,
+    overwrite: true,
+    publicId,
+    timestamp,
+    signature
+  };
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {

@@ -10,6 +10,11 @@ import Link from "next/link";
 type Design = any;
 const LIMITS = [12, 24, 48, 100];
 
+function thumbnailUrl(url: string): string {
+  if (!url.includes("res.cloudinary.com/") || !url.includes("/image/upload/")) return url;
+  return url.replace("/image/upload/", "/image/upload/w_112,h_112,c_fill,g_auto,f_auto,q_auto/");
+}
+
 export default function DesignsPage() {
   const { toast } = useToast();
   const [rows, setRows] = useState<Design[]>([]);
@@ -35,6 +40,7 @@ export default function DesignsPage() {
   const [deleting, setDeleting] = useState<Design[] | null>(null);
   const [bulkAction, setBulkAction] = useState<"" | "publish" | "unpublish" | "delete">("");
   const [busy, setBusy] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<Set<string>>(new Set());
 
   // Debounce search so 6000-row catalogs aren't queried per keystroke
   useEffect(() => {
@@ -42,8 +48,8 @@ export default function DesignsPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({
@@ -66,7 +72,7 @@ export default function DesignsPage() {
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qLive, fCat, fSub, fStatus, sort, page, limit]);
@@ -86,15 +92,30 @@ export default function DesignsPage() {
   }
 
   async function togglePublish(row: Design) {
+    if (statusUpdating.has(row.id)) return;
+    const nextIsActive = row.isActive === false;
+    setStatusUpdating((current) => new Set(current).add(row.id));
+    setRows((current) => current.map((item) =>
+      item.id === row.id ? { ...item, isActive: nextIsActive } : item
+    ));
     try {
       await api(`/api/designs/${row.id}`, {
         method: "PUT",
-        body: JSON.stringify({ isActive: row.isActive === false })
+        body: JSON.stringify({ isActive: nextIsActive })
       });
-      toast("success", row.isActive === false ? `"${row.name}" is now live on the app.` : `"${row.name}" is now hidden from the app.`);
-      await load();
+      toast("success", nextIsActive ? `"${row.name}" is now live on the app.` : `"${row.name}" is now hidden from the app.`);
+      await load(false);
     } catch (e: any) {
+      setRows((current) => current.map((item) =>
+        item.id === row.id ? { ...item, isActive: row.isActive } : item
+      ));
       toast("error", e.message);
+    } finally {
+      setStatusUpdating((current) => {
+        const next = new Set(current);
+        next.delete(row.id);
+        return next;
+      });
     }
   }
 
@@ -181,7 +202,7 @@ export default function DesignsPage() {
       {error && (
         <div className="mb-3">
           <StateView icon="!" tone="red" title="Couldn't load designs" hint={`${error} - please check your connection and try again.`}
-            action={<button className="btn-gold" onClick={load}>Try again</button>} />
+            action={<button className="btn-gold" onClick={() => load()}>Try again</button>} />
         </div>
       )}
 
@@ -226,7 +247,7 @@ export default function DesignsPage() {
                       <div className="flex items-center gap-3 min-w-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {d.imageUrl
-                          ? <img src={d.imageUrl} alt={d.name} loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0" />
+                          ? <img src={thumbnailUrl(d.imageUrl)} alt={d.name} width={56} height={56} loading="lazy" decoding="async" className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0" />
                           : <div className="w-14 h-14 rounded-xl bg-slate-100 grid place-items-center text-xs text-slate-400 shrink-0">No image</div>}
                         <div className="min-w-0">
                           <div className="font-bold truncate max-w-[260px]" title={d.name}>{d.name}</div>
@@ -238,11 +259,17 @@ export default function DesignsPage() {
                     <td><span className="pill bg-[#faf3dd] text-[#7a5c00] border border-gold/30">{d.subcategory}</span></td>
                     <td>
                       <button
+                        type="button"
                         title={live ? "Click to unpublish" : "Click to publish"}
+                        aria-label={`${statusUpdating.has(d.id) ? "Updating status for" : live ? "Unpublish" : "Publish"} ${d.name}`}
+                        aria-busy={statusUpdating.has(d.id)}
+                        disabled={statusUpdating.has(d.id)}
                         onClick={() => togglePublish(d)}
-                        className={`pill border transition ${live ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"}`}
+                        className={`pill min-w-[84px] justify-center border transition disabled:cursor-wait disabled:opacity-70 ${live ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"}`}
                       >
-                        {live ? "Live" : "Hidden"}
+                        {statusUpdating.has(d.id) ? (
+                          <><span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" /> Saving</>
+                        ) : live ? "Live" : "Hidden"}
                       </button>
                     </td>
                     <td className="text-right whitespace-nowrap">
@@ -267,23 +294,33 @@ export default function DesignsPage() {
         )}
 
         {/* Pagination footer */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
-          <span className="text-xs text-slate-500 font-semibold">
-            {total === 0 ? "0 results" : `Showing ${((page - 1) * limit) + 1}-${Math.min(page * limit, total)} of ${total.toLocaleString()}`}
-          </span>
-          <select className="input !w-auto !py-1.5 !text-xs ml-1" value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}>
-            {LIMITS.map((l) => <option key={l} value={l}>{l} / page</option>)}
-          </select>
-          <div className="ml-auto flex items-center gap-1">
-            <PageBtn label="Previous" disabled={page <= 1} onClick={() => setPage(page - 1)} />
-            {pages.map((p) => (
-              <button key={p} onClick={() => setPage(p)}
-                className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-blue-600 text-white" : "border border-slate-200 bg-white hover:border-blue-300"}`}>
-                {p}
-              </button>
-            ))}
-            <PageBtn label="Next" disabled={page >= totalPages} onClick={() => setPage(page + 1)} />
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <span className="font-semibold text-slate-700">
+              {total === 0 ? "0 results" : `${((page - 1) * limit) + 1}-${Math.min(page * limit, total)} of ${total.toLocaleString()}`}
+            </span>
+            <label className="flex items-center gap-2">
+              <span>Rows per page</span>
+              <select aria-label="Rows per page" className="input !w-auto !py-1.5 !text-xs" value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}>
+                {LIMITS.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </label>
           </div>
+          <nav className="flex items-center justify-between gap-2 sm:ml-auto sm:justify-end" aria-label="Design table pages">
+            <PageBtn label="Previous" disabled={page <= 1} onClick={() => setPage(page - 1)} />
+            <div className="flex items-center gap-1">
+              {pages.map((entry, index) => entry === "ellipsis" ? (
+                <span key={`ellipsis-${index}`} aria-hidden="true" className="px-1.5 text-xs text-slate-400">…</span>
+              ) : (
+                <button key={entry} type="button" onClick={() => setPage(entry)} aria-label={`Go to page ${entry}`} aria-current={entry === page ? "page" : undefined}
+                  className={`grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs font-semibold transition ${entry === page ? "bg-blue-600 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"}`}>
+                  {entry}
+                </button>
+              ))}
+            </div>
+            <span className="hidden whitespace-nowrap text-xs text-slate-500 md:block">Page {page} of {totalPages}</span>
+            <PageBtn label="Next" disabled={page >= totalPages} onClick={() => setPage(page + 1)} />
+          </nav>
         </div>
       </div>
 
@@ -319,11 +356,17 @@ function PageBtn({ label, disabled, onClick }: { label: string; disabled: boolea
   );
 }
 
-function pageWindow(page: number, totalPages: number): number[] {
-  const out: number[] = [];
-  const from = Math.max(1, Math.min(page - 2, totalPages - 4));
-  const to = Math.min(totalPages, from + 4);
-  for (let p = from; p <= to; p++) out.push(p);
+function pageWindow(page: number, totalPages: number): Array<number | "ellipsis"> {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  const pages = new Set([1, totalPages, page, page - 1, page + 1]);
+  const sorted = Array.from(pages).filter((value) => value >= 1 && value <= totalPages).sort((a, b) => a - b);
+  const out: Array<number | "ellipsis"> = [];
+
+  sorted.forEach((value, index) => {
+    if (index > 0 && value - sorted[index - 1] > 1) out.push("ellipsis");
+    out.push(value);
+  });
   return out;
 }
 

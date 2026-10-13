@@ -7,6 +7,7 @@ import { PageHeader, StateView } from "@/components/ui";
 import { StatusPill } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/client";
+import { GeminiSettings } from "./GeminiSettings";
 
 export default function IntegrationsPage() {
   const { toast } = useToast();
@@ -101,7 +102,7 @@ export default function IntegrationsPage() {
 
   return (
     <Shell>
-      <PageHeader title="Integrations" subtitle="Cloudinary credentials live in the private Firestore doc settings/integrations — never public, never returned to the browser." />
+      <PageHeader title="Integrations" subtitle="Manage private Cloudinary credentials and Gemini AI keys and model settings." />
 
       {loading && (
         <div className="grid lg:grid-cols-5 gap-4 items-start">
@@ -124,6 +125,7 @@ export default function IntegrationsPage() {
       )}
 
       {!loading && !error && (
+        <>
         <div className="grid lg:grid-cols-5 gap-4 items-start">
           <div className="card p-5 lg:col-span-3">
             <div className="flex items-center gap-2 mb-4">
@@ -176,6 +178,8 @@ export default function IntegrationsPage() {
             )}
           </div>
         </div>
+        <GeminiSettings />
+        </>
       )}
     </Shell>
   );

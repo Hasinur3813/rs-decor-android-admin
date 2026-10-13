@@ -13,9 +13,12 @@ live on the app instantly (the app observes Firestore in real time).
 | Rooms | `subcategories/{id}` — `name, nameEn, slug, order` | Currently hardcoded fallback in `DummyCatalogData`; wire to this collection (snippet below) |
 | Contact + Hero | `settings/app` — `phoneNumber, phoneDisplay, whatsappNumber, heroTitle, heroSubtitle, heroDescription, heroImageUrl` | Currently hardcoded in `ContactActions` / `HeroShowcaseBanner`; wire to this doc (snippet below) |
 
-Images are uploaded server-side to **Cloudinary** (`/api/upload`) and only the
-CDN `secure_url` is stored in Firestore. Deleting/replacing removes the old
-Cloudinary asset automatically.
+Images are uploaded directly from the browser to **Cloudinary** using a
+short-lived signature from the authenticated `/api/upload/signature` endpoint,
+so large originals do not pass through a Vercel Function. Only the CDN
+`secure_url` is stored in Firestore. Deleting/replacing removes the old
+Cloudinary asset automatically. The design upload queue accepts files up to
+50 MiB each, subject to Cloudinary account and format limits.
 
 ## Setup
 
@@ -39,14 +42,25 @@ Cloudinary asset automatically.
    Fill `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
    (keep the `\n` escapes). Set `FIREBASE_DATABASE_ID` only if you use a
    non-default database (the Android app reads `R.string.firestore_database_id`).
-3. **Cloudinary** — Dashboard → API keys. Fill `CLOUDINARY_CLOUD_NAME`,
+4. **Cloudinary** — Dashboard → API keys. Fill `CLOUDINARY_CLOUD_NAME`,
    `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Optional `CLOUDINARY_FOLDER`
    (default `rs-decor`; uploads land in `…/designs|​categories|​hero`).
-4. **Admin key** — generate and set:
+5. **Optional AI metadata suggestions** — create Gemini API keys in Google AI
+   Studio and add them under **Settings → Integrations → Gemini**. Up to ten
+   keys can be saved; they remain server-side and are rotated across fallback
+   attempts, with another key/model tried on quota and availability
+   errors. Configure a specific supported model or use Auto mode. `GEMINI_API_KEY`
+   in the server environment remains a single-key fallback. On the upload page,
+   choose title language, maximum title length, AI request parallelism and
+   thumbnail preview workers. These page preferences are saved in the current
+   browser. Gemini is called only when an administrator requests suggestions;
+   the browser prepares a separate AI copy (up to 3 MiB), while Cloudinary
+   receives the original file. Without a key, regular uploads still work.
+6. **Admin key** — generate and set:
    ```bash
    openssl rand -hex 32   # → ADMIN_API_KEY
    ```
-5. **Run**
+7. **Run**
    ```bash
    npm run dev      # http://localhost:3000
    ```
@@ -69,9 +83,9 @@ up to 200 ids per call via `POST /api/designs/bulk`.
 ## Deploy
 
 Any Node host works (VPS, Render, Railway, Vercel). Set the same env vars on the
-host, then `npm run build && npm start`. Keep the service-account key and
-Cloudinary secret server-side only — nothing under `FIREBASE_*` /
-`CLOUDINARY_*` is ever bundled to the browser.
+host, then `npm run build && npm start`. Keep the service-account key,
+Cloudinary secret and Gemini API key server-side only — nothing under
+`FIREBASE_*`, `CLOUDINARY_*` or `GEMINI_API_KEY` is bundled to the browser.
 
 ## Harden Firestore rules (recommended)
 
@@ -117,5 +131,8 @@ strictly additive — existing admin docs are never overwritten.
 - `GET/POST /api/categories` · `PUT/DELETE /api/categories/[id]` (delete blocked while designs reference the slug)
 - `GET/POST /api/subcategories` · `PUT/DELETE /api/subcategories/[id]` (rename cascades to designs)
 - `GET/PUT /api/settings` (single doc `settings/app`)
-- `POST/DELETE /api/upload` (multipart `file`, `kind`, optional `publicId`)
+- `GET/PUT /api/integrations/gemini` (server-side Gemini keys and model preference)
+- `POST /api/upload/signature` (authenticated Cloudinary direct-upload signature; JSON `kind`)
+- `POST/DELETE /api/upload` (legacy server-proxy upload, max 12 MiB / delete by `publicId`)
+- `POST /api/designs/generate-metadata` (multipart `file`; optional Gemini-backed metadata suggestions)
 - `GET /api/dashboard` (counts, per-category chart, recent designs)
