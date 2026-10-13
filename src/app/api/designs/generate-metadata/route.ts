@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb, toErrorStatus } from "@/lib/firebaseAdmin";
-import { getGeminiConfig, type GeminiModel } from "@/lib/geminiConfig";
+import { requestWithGeminiFallback } from "@/lib/geminiFallback";
+import { GEMINI_AUTO_MODELS, getGeminiConfig, type GeminiModel } from "@/lib/geminiConfig";
 import { requireSession } from "@/lib/requireSession";
 
 export const runtime = "nodejs";
@@ -8,7 +9,6 @@ export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const SUPPORTED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const AUTO_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 const REQUEST_TIMEOUT_MS = 20_000;
 
 type CatalogChoice = { name: string; nameEn: string; slug: string };
@@ -25,7 +25,7 @@ function catalogChoices(docs: FirebaseFirestore.QueryDocumentSnapshot[]): Catalo
 }
 
 function getModels(model: GeminiModel): string[] {
-  return model === "auto" ? AUTO_MODELS : [model];
+  return model === "auto" ? [...GEMINI_AUTO_MODELS] : [model];
 }
 
 let nextKeyIndex = 0;
@@ -146,102 +146,50 @@ export async function POST(req: Request) {
     ].join("\n");
 
     const imageData = Buffer.from(await file.arrayBuffer()).toString("base64");
-    let successfulResponse: Response | null = null;
-    let selectedModel = "";
-    let lastStatus = 0;
-    let rateLimited = false;
-    let keyAuthorizationFailed = false;
-    let serviceUnavailable = false;
-    let lastError: unknown;
-
-    modelLoop: for (const candidateModel of getModels(model)) {
-      for (const candidateKey of rotatedKeys(keys)) {
-        try {
-          const response = await requestGemini(
-            candidateModel,
-            candidateKey.key,
-            prompt,
-            mimeType,
-            imageData,
-            categories.map((item) => item.slug),
-            subcategories.map((item) => item.slug)
-          );
-          if (response.ok) {
-            successfulResponse = response;
-            selectedModel = candidateModel;
-            break modelLoop;
-          }
-
-          lastStatus = response.status;
-          if (response.status === 429) {
-            rateLimited = true;
-            continue;
-          }
-          if (response.status === 401 || response.status === 403) {
-            keyAuthorizationFailed = true;
-            continue;
-          }
-          if (response.status >= 500) {
-            serviceUnavailable = true;
-            continue;
-          }
-          if (response.status === 400) {
-            const providerError = await response.text();
-            if (/api.?key|credential|unauthorized/i.test(providerError)) {
-              keyAuthorizationFailed = true;
-              continue;
-            }
-            if (model === "auto") continue modelLoop;
-          }
-          if (model === "auto" && [404, 501].includes(response.status)) continue modelLoop;
-
-          console.error("Gemini metadata request returned an error", {
-            status: response.status,
-            model: candidateModel
-          });
-          return NextResponse.json(
-            { error: `Gemini rejected the request for model ${candidateModel}. Check the model and API key settings.` },
-            { status: 502 }
-          );
-        } catch (error) {
-          lastError = error;
-          if (error instanceof Error && error.name === "AbortError") {
-            serviceUnavailable = true;
-            continue;
-          }
-          console.error("Gemini metadata request failed before receiving a response", error);
-          serviceUnavailable = true;
-        }
-      }
-    }
-
-    if (!successfulResponse) {
-      if (rateLimited && !serviceUnavailable) {
+    const fallback = await requestWithGeminiFallback(
+      getModels(model),
+      rotatedKeys(keys).map((item) => item.key),
+      (candidateModel, candidateKey) => requestGemini(
+        candidateModel,
+        candidateKey,
+        prompt,
+        mimeType,
+        imageData,
+        categories.map((item) => item.slug),
+        subcategories.map((item) => item.slug)
+      )
+    );
+    if (!fallback.ok) {
+      console.error("Gemini metadata request exhausted configured keys/models", {
+        reason: fallback.reason,
+        attempts: fallback.attempts
+      });
+      if (fallback.reason === "rate-limited") {
         return NextResponse.json(
-          { error: "All configured Gemini keys are rate-limited for the available models. Wait and retry." },
+          { error: "All configured Gemini key/model attempts were rate-limited. Keys in the same Google Cloud project share project quota; wait for quota reset or configure a key from another project." },
           { status: 429 }
         );
       }
-      if (serviceUnavailable) {
-        console.error("Gemini metadata request exhausted configured keys/models", { lastStatus, lastError });
-        return NextResponse.json(
-          { error: "Gemini is temporarily unavailable across configured keys/models. Please retry." },
-          { status: 503 }
-        );
-      }
-      if (keyAuthorizationFailed) {
+      if (fallback.reason === "unauthorized") {
         return NextResponse.json(
           { error: "Gemini rejected all configured API keys. Check the keys in Settings → Integrations." },
           { status: 502 }
         );
       }
+      if (fallback.reason === "mixed") {
+        return NextResponse.json(
+          { error: "Some Gemini attempts were rate-limited, while others failed for different reasons. Check model availability and project quota, then retry." },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
-        { error: "No configured Gemini key could authorize a request. Check the saved API keys." },
-        { status: 502 }
+        { error: "Gemini could not complete the request. One or more configured keys or models failed for reasons other than rate limits. Please retry, check model availability, or review the server logs." },
+        { status: 503 }
       );
     }
 
-    const response = await successfulResponse.json();
+    const selectedModel = fallback.model;
+    const response = await fallback.response.json();
     const text = response?.candidates?.[0]?.content?.parts
       ?.map((part: { text?: unknown }) => typeof part.text === "string" ? part.text : "")
       .join("")

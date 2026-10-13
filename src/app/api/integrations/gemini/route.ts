@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { adminDb, serverTimestamp, toErrorStatus } from "@/lib/firebaseAdmin";
-import { GEMINI_MODELS } from "@/lib/geminiConfig";
+import { GEMINI_MODELS, GEMINI_PING_MODEL } from "@/lib/geminiConfig";
 import { requireSession } from "@/lib/requireSession";
 
 export const runtime = "nodejs";
@@ -12,6 +12,51 @@ const MAX_KEYS = 10;
 
 function maskKey(key: string): string {
   return `••••${key.slice(-4)}`;
+}
+
+async function pingGeminiKey(key: string, selectedModel: unknown) {
+  const model = typeof selectedModel === "string" &&
+    (GEMINI_MODELS as readonly string[]).includes(selectedModel) &&
+    selectedModel !== "auto"
+    ? selectedModel
+    : GEMINI_PING_MODEL;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}`,
+      { headers: { "x-goog-api-key": key }, signal: controller.signal, cache: "no-store" }
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { ok: false as const, status: 504, error: "Gemini key check timed out. Please retry." };
+    }
+    console.error("Gemini API-key ping could not reach Google", error);
+    return { ok: false as const, status: 502, error: "Could not reach Google to verify this key." };
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (response.ok) {
+    const modelInfo = await response.json();
+    const methods = modelInfo?.supportedGenerationMethods;
+    if (Array.isArray(methods) && !methods.includes("generateContent")) {
+      return { ok: false as const, status: 400, error: `${model} is not available for content generation with this key.` };
+    }
+    return { ok: true as const, model };
+  }
+  if (response.status === 429) {
+    return { ok: false as const, status: 429, error: "Google rate-limited this key check. Wait briefly and retry." };
+  }
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false as const, status: 400, error: "Google rejected this API key. Check that it is valid and Gemini API is enabled." };
+  }
+  if (response.status === 404) {
+    return { ok: false as const, status: 400, error: `Model ${model} is not available. Choose another model or Auto.` };
+  }
+  console.error("Gemini API-key ping returned an error", { status: response.status, model });
+  return { ok: false as const, status: 502, error: "Google could not verify this key right now." };
 }
 
 export async function GET() {
@@ -62,7 +107,7 @@ export async function PUT(req: Request) {
     const currentKeys = Array.isArray(existing?.apiKeys) ? existing.apiKeys : [];
     const action = typeof body.action === "string" ? body.action : "";
 
-    if (action === "add-key") {
+    if (action === "ping-key" || action === "add-key") {
       const label = typeof body.label === "string" ? body.label.trim().slice(0, 60) : "";
       const key = typeof body.key === "string" ? body.key.trim() : "";
       if (key.length < 20 || key.length > 512 || /\s/.test(key)) {
@@ -74,6 +119,18 @@ export async function PUT(req: Request) {
       if (currentKeys.some((value) =>
         typeof value === "object" && value !== null &&
         "key" in value && value.key === key
+      )) {
+        if (action === "add-key") {
+          return NextResponse.json({ error: "That API key is already configured." }, { status: 409 });
+        }
+      }
+      const ping = await pingGeminiKey(key, action === "add-key" ? "auto" : body.model);
+      if (!ping.ok) return NextResponse.json({ error: ping.error }, { status: ping.status });
+      if (action === "ping-key") {
+        return NextResponse.json({ ok: true, model: ping.model, message: `Key verified with ${ping.model}.` });
+      }
+      if (currentKeys.some((value) =>
+        typeof value === "object" && value !== null && "key" in value && value.key === key
       )) {
         return NextResponse.json({ error: "That API key is already configured." }, { status: 409 });
       }

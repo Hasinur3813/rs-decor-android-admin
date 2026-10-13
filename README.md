@@ -47,9 +47,14 @@ Cloudinary asset automatically. The design upload queue accepts files up to
    (default `rs-decor`; uploads land in `…/designs|​categories|​hero`).
 5. **Optional AI metadata suggestions** — create Gemini API keys in Google AI
    Studio and add them under **Settings → Integrations → Gemini**. Up to ten
-   keys can be saved; they remain server-side and are rotated across fallback
-   attempts, with another key/model tried on quota and availability
-   errors. Configure a specific supported model or use Auto mode. `GEMINI_API_KEY`
+   keys can be saved after a server-side ping verifies key/model access; the
+   browser never receives saved secrets. Up to ten panel keys are rotated on
+   rate limits and availability errors. Auto tries Gemini 2.5 Flash-Lite, then
+   Flash; Gemini 2.5 Pro is also available as the higher-capability option.
+   Check [model availability](https://ai.google.dev/gemini-api/docs/models)
+   and [pricing/free-tier access](https://ai.google.dev/gemini-api/docs/pricing).
+   Google applies request quotas per project, not per API key, so additional
+   keys in the same project do not increase project-wide quota. `GEMINI_API_KEY`
    in the server environment remains a single-key fallback. On the upload page,
    choose title language, maximum title length, AI request parallelism and
    thumbnail preview workers. These page preferences are saved in the current
@@ -131,7 +136,7 @@ strictly additive — existing admin docs are never overwritten.
 - `GET/POST /api/categories` · `PUT/DELETE /api/categories/[id]` (delete blocked while designs reference the slug)
 - `GET/POST /api/subcategories` · `PUT/DELETE /api/subcategories/[id]` (rename cascades to designs)
 - `GET/PUT /api/settings` (single doc `settings/app`)
-- `GET/PUT /api/integrations/gemini` (server-side Gemini keys and model preference)
+- `GET/PUT /api/integrations/gemini` (server-side Gemini keys and model preference; `ping-key` verifies access before saving)
 - `POST /api/upload/signature` (authenticated Cloudinary direct-upload signature; JSON `kind`)
 - `POST/DELETE /api/upload` (legacy server-proxy upload, max 12 MiB / delete by `publicId`)
 - `POST /api/designs/generate-metadata` (multipart `file`; optional Gemini-backed metadata suggestions)

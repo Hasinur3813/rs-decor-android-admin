@@ -2,12 +2,15 @@ import { adminDb } from "@/lib/firebaseAdmin";
 
 export const GEMINI_MODELS = [
   "auto",
-  "gemini-2.5-pro",
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
   "gemini-2.5-flash",
-  "gemini-2.5-flash-lite"
+  "gemini-2.5-pro"
 ] as const;
 
 export type GeminiModel = (typeof GEMINI_MODELS)[number];
+export const GEMINI_AUTO_MODELS = ["gemini-3.1-flash-lite","gemini-3.5-flash-lite", "gemini-2.5-flash"] as const;
+export const GEMINI_PING_MODEL = "gemini-2.5-flash";
 
 export type GeminiApiKey = {
   id: string;

@@ -18,6 +18,8 @@ export function GeminiSettings() {
   const [data, setData] = useState<GeminiSettingsData | null>(null);
   const [label, setLabel] = useState("");
   const [key, setKey] = useState("");
+  const [pingedKey, setPingedKey] = useState("");
+  const [pingMessage, setPingMessage] = useState("");
   const [selectedModel, setSelectedModel] = useState("auto");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,15 +41,38 @@ export function GeminiSettings() {
 
   useEffect(() => { void load(); }, []);
 
+  async function pingKey() {
+    setSaving(true);
+    setPingMessage("");
+    setPingedKey("");
+    try {
+      const result = await api<{ model: string; message: string }>("/api/integrations/gemini", {
+        method: "PUT",
+        body: JSON.stringify({ action: "ping-key", key, model: selectedModel })
+      });
+      setPingedKey(`${key.trim()}::${selectedModel}`);
+      setPingMessage(result.message);
+      toast("success", result.message);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Gemini key check failed.";
+      setPingMessage(message);
+      toast("error", message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function addKey() {
     setSaving(true);
     try {
       await api("/api/integrations/gemini", {
         method: "PUT",
-        body: JSON.stringify({ action: "add-key", label, key })
+        body: JSON.stringify({ action: "add-key", label, key, model: selectedModel })
       });
       setLabel("");
       setKey("");
+      setPingedKey("");
+      setPingMessage("");
       await load();
       toast("success", "Gemini API key added.");
     } catch (cause) {
@@ -131,16 +156,26 @@ export function GeminiSettings() {
             ) : (
               <p className="mb-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Add a Gemini API key to enable metadata suggestions.</p>
             )}
-            {data.keys.filter((saved) => saved.id !== "environment").length < 10 && (
-              <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+            {data.panelKeyCount < 10 && (
+              <div className="space-y-2">
                 <input className="input" aria-label="API key label" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Label (optional)" maxLength={60} disabled={saving} />
-                <input className="input font-mono" aria-label="Gemini API key" type="password" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste Gemini API key" autoComplete="new-password" disabled={saving} />
-                <button type="button" className="btn-gold !px-4" disabled={saving || !key.trim()} onClick={() => { void addKey(); }}>
-                  {saving ? "Saving…" : "Add key"}
-                </button>
+                <input className="input font-mono" aria-label="Gemini API key" type="password" value={key} onChange={(event) => { setKey(event.target.value); setPingMessage(""); }} placeholder="Paste Gemini API key" autoComplete="new-password" disabled={saving} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="btn-ghost" disabled={saving || !key.trim()} onClick={() => { void pingKey(); }}>
+                    {saving && pingMessage === "" ? "Checking…" : "Ping key"}
+                  </button>
+                  <button type="button" className="btn-gold !px-4" disabled={saving || !key.trim()} onClick={() => { void addKey(); }}>
+                    {saving ? "Verifying & saving…" : "Verify & add key"}
+                  </button>
+                  {pingMessage && <span className={`text-xs ${pingedKey === `${key.trim()}::${selectedModel}` ? "text-emerald-700" : "text-red-700"}`} role="status">{pingMessage}</span>}
+                </div>
+                <p className="text-[10px] text-slate-400">Ping checks the selected model. Adding a key independently verifies access to Flash-Lite before saving; neither check guarantees generation quota is available.</p>
               </div>
             )}
             {data.keySource === "environment" && <p className="text-[11px] text-slate-500">The environment key is kept as a fallback and cannot be removed from this page. Add panel keys above to enable key rotation.</p>}
+            <p className="mt-3 rounded-lg bg-blue-50 p-2 text-[11px] leading-relaxed text-blue-800">
+              Keys belonging to the same Google Cloud project share that project’s quota. Additional keys may help with key-specific limits, but do not multiply project-wide quota.
+            </p>
           </div>
 
           <div>
@@ -148,11 +183,17 @@ export function GeminiSettings() {
             <label className="label" htmlFor="gemini-model">Model selection</label>
             <select id="gemini-model" className="input" value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)} disabled={saving}>
               {data.models.map((model) => (
-                <option key={model} value={model}>{model === "auto" ? "Auto — fallback across supported models" : model}</option>
+                <option key={model} value={model}>
+                  {model === "auto"
+                    ? "Auto — Flash-Lite, then Flash"
+                    : model === "gemini-2.5-pro"
+                      ? "Gemini 2.5 Pro — higher-capability option"
+                      : `${model} — free tier where available`}
+                </option>
               ))}
             </select>
             <p className="mt-2 text-xs leading-relaxed text-slate-500">
-              Auto tries the preferred Flash model, then compatible fallback models. Manual selection uses that model and rotates through keys when a key is rate-limited or unavailable.
+              Auto tries Flash-Lite first, then Flash. Gemini 2.5 Pro is included as the higher-capability option and may require paid-tier access. See Google’s <a className="font-semibold underline" href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noreferrer">model list</a> and <a className="font-semibold underline" href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noreferrer">pricing</a>.
             </p>
             <button type="button" className="btn-ghost mt-3" disabled={saving || selectedModel === data.model} onClick={() => { void saveModel(); }}>
               Save model
