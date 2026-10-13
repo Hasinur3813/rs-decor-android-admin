@@ -4,18 +4,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        obsidian: "#0c0d12",
-        surface: "#151824",
-        surface2: "#1d2233",
-        cardborder: "#2b3247",
-        gold: "#c9a227",
-        goldbright: "#e8c547",
-        ink: "#f4f1e8",
-        muted: "#9aa1b5"
+        obsidian: "#182230",
+        surface: "#263448",
+        surface2: "#33445c",
+        cardborder: "#e7eaf1",
+        gold: "#4263eb",
+        goldbright: "#6d83f2",
+        ink: "#f8fafc",
+        muted: "#aab4c2"
       },
       boxShadow: {
-        soft: "0 8px 30px rgba(0,0,0,.25)",
-        card: "0 2px 12px rgba(0,0,0,.18)"
+        soft: "0 12px 32px rgba(24,34,48,.12)",
+        card: "0 2px 8px rgba(24,34,48,.04)"
       },
       borderRadius: { xl2: "1.1rem" }
     }

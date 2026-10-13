@@ -157,7 +157,7 @@ export default function IntegrationsPage() {
               <button className="btn-ghost" disabled={saving} onClick={retest}>↻ Re-test</button>
               <button className="btn-ghost hover:!border-red-400 hover:text-red-600" disabled={saving} onClick={remove}>{armingRemove ? "Tap again to confirm" : "Remove override"}</button>
             </div>
-            {msg && <div className="card p-3 text-sm mt-3 !bg-[#faf8f2]">{msg}</div>}
+            {msg && <div className="card mt-3 bg-slate-50 p-3 text-sm">{msg}</div>}
             <p className="text-[11px] text-slate-400 mt-3">Find these in Cloudinary → Dashboard → API keys. Leaving all fields to server <code>.env</code> also works — the panel override simply wins when complete.</p>
           </div>
 
@@ -183,7 +183,7 @@ export default function IntegrationsPage() {
 
 function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between gap-3 border-b border-[#f0ece0] pb-1.5">
+    <div className="flex justify-between gap-3 border-b border-slate-100 pb-1.5">
       <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{k}</span>
       <span className={`text-right font-semibold ${mono ? "font-mono text-[13px]" : ""}`}>{v}</span>
     </div>

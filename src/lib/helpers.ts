@@ -9,6 +9,34 @@ export function slugify(input: string): string {
     .slice(0, 64);
 }
 
+const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "avif", "heic", "heif", "jfif", "bmp", "tif", "tiff", "svg", "ico"];
+
+export function fileExt(name: string): string {
+  return (name.split(".").pop() || "").toLowerCase();
+}
+
+/**
+ * True for anything we should let through to the queue.
+ * Admins upload from phones, cameras and scanners with unpredictable MIME
+ * types (notably empty ones), so we only reject files that are DEFINITELY
+ * not photos (video/audio/documents). Anything uncertain goes through —
+ * Cloudinary performs the final content validation at upload time with a
+ * clear error, which beats a confusing "no images found" at selection time.
+ */
+export function isImageFile(f: File): boolean {
+  const type = (f.type || "").toLowerCase();
+  if (type.startsWith("image/")) return true;
+  const name = f.name || "";
+  const dot = name.lastIndexOf(".");
+  if (dot < 0) return true; // extensionless (some phone transfers strip it) — server decides
+  const ext = name.slice(dot + 1).toLowerCase();
+  // Declared non-image type OR unknown type: trust only photo extensions.
+  return IMAGE_EXTS.includes(ext);
+}
+
+/** Accept attribute covering real image types + extension fallbacks. */
+export const IMAGE_ACCEPT = "image/*,.heic,.heif";
+
 export function slugifyAscii(input: string): string {
   return (input || "")
     .trim()

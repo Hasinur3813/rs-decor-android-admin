@@ -3,12 +3,38 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Shell } from "@/components/Shell";
-import { PageHeader, SkeletonStats, StateView } from "@/components/ui";
-import { StatusPill } from "@/components/ui";
+import { PageHeader, SkeletonStats, StateView, StatusPill } from "@/components/ui";
 import { api } from "@/lib/client";
 
+type DashboardData = {
+  counts: {
+    designs: number;
+    hidden: number;
+    categories: number;
+    subcategories: number;
+    heroConfigured: boolean;
+  };
+  integrations?: {
+    cloudinary?: {
+      connected?: boolean;
+      configured?: boolean;
+      cloudName?: string;
+      source?: string;
+      message?: string;
+    };
+  };
+  perCategory?: Record<string, number>;
+  recent?: Array<{
+    id: string;
+    name: string;
+    category: string;
+    subcategory: string;
+    imageUrl: string;
+  }>;
+};
+
 export default function DashboardPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -16,111 +42,131 @@ export default function DashboardPage() {
     setLoading(true);
     setError("");
     try {
-      setData(await api("/api/dashboard"));
-    } catch (e: any) {
-      setError(e.message);
+      setData(await api<DashboardData>("/api/dashboard"));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unexpected error");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
   return (
     <Shell>
-      <PageHeader title="Good to see you 👋" subtitle="Here's what's live on your Android app right now.">
-        <Link href="/designs" className="btn-gold !py-2">＋ Add design</Link>
-        <Link href="/settings" className="btn-ghost !py-2">Edit hero</Link>
+      <PageHeader title="Overview" subtitle="A clear view of your catalog and what customers see in the app.">
+        <Link href="/designs/upload" className="btn-gold">＋ Add designs</Link>
       </PageHeader>
 
       {loading && <SkeletonStats count={4} />}
 
       {!loading && error && (
-        <StateView icon="🔌" tone="red" title="Couldn't load the overview"
-          hint={`${error} — please check your connection and try again.`}
-          action={<button className="btn-gold" onClick={load}>↻ Try again</button>} />
+        <StateView icon="!" tone="red" title="We couldn't load your overview"
+          hint={`${error} — check your connection and try again.`}
+          action={<button className="btn-gold" onClick={() => void load()}>Try again</button>} />
       )}
 
       {!loading && !error && data && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Stat label="Designs" sub={`${data.counts.hidden || 0} hidden`} value={data.counts.designs} href="/designs" icon="▦" />
-            <Stat label="Categories" sub="filter pills" value={data.counts.categories} href="/categories" icon="❖" />
-            <Stat label="Rooms" sub="room filters" value={data.counts.subcategories} href="/subcategories" icon="⬣" />
-            <Stat label="Hero banner" sub={data.counts.heroConfigured ? "live on home" : "needs an image"} value={data.counts.heroConfigured ? "Ready ✓" : "Missing!"} href="/settings" icon="◈" alert={!data.counts.heroConfigured} />
-          </div>
+        <div className="space-y-6">
+          <section className="relative overflow-hidden rounded-2xl bg-slate-950 p-6 text-white shadow-lg shadow-slate-900/10 sm:p-8">
+            <div className="pointer-events-none absolute -right-16 -top-32 h-80 w-80 rounded-full border-[44px] border-blue-500/10" />
+            <div className="pointer-events-none absolute -bottom-44 right-32 h-80 w-80 rounded-full border-[44px] border-indigo-400/[.08]" />
+            <div className="relative flex flex-wrap items-end justify-between gap-6">
+              <div className="max-w-xl">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.06] px-3 py-1.5 text-xs font-medium text-blue-100">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Workspace is live
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight sm:text-[28px]">Your catalog, at a glance.</h2>
+                <p className="mt-2 max-w-lg text-sm leading-6 text-slate-300">Keep your designs organized and publish updates directly to the RS Decor app.</p>
+              </div>
+              <Link href="/settings" className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[.07] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/[.12]">
+                Manage app settings <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </section>
+
+          <section aria-label="Catalog summary" className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
+            <Stat label="Designs" description={`${data.counts.hidden || 0} hidden from the app`} value={data.counts.designs} href="/designs" icon="image" />
+            <Stat label="Categories" description="Catalog collections" value={data.counts.categories} href="/categories" icon="layers" />
+            <Stat label="Rooms" description="Browse filters" value={data.counts.subcategories} href="/subcategories" icon="room" />
+            <Stat label="Home banner" description={data.counts.heroConfigured ? "Visible in the app" : "Add an image to publish"} value={data.counts.heroConfigured ? "Published" : "Needs attention"} href="/settings" icon="spark" alert={!data.counts.heroConfigured} />
+          </section>
 
           {data.integrations?.cloudinary && (
-            <Link href="/settings/integrations" className={`card card-hover p-4 sm:p-5 flex flex-wrap items-center gap-3 ${!data.integrations.cloudinary.connected ? "ring-2 ring-red-300" : ""}`}>
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-gold/15 to-goldbright/10 border border-gold/25 grid place-items-center text-xl">☁️</div>
-              <div className="min-w-0">
-                <div className="font-bold text-[15px]">Cloudinary image storage</div>
-                <div className="text-xs text-slate-500 truncate">
+            <Link href="/settings/integrations" className={`card card-hover flex flex-wrap items-center gap-4 p-4 sm:px-5 ${!data.integrations.cloudinary.connected ? "border-amber-200" : ""}`}>
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 16.2A4.8 4.8 0 0 0 17 7.5a6 6 0 0 0-11.7 1.8A4.5 4.5 0 0 0 6 18h13" /><path d="m12 12-3 3m3-3 3 3m-3-3v8" /></svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-slate-900">Cloudinary image storage</div>
+                <div className="mt-0.5 truncate text-xs text-slate-500">
                   {data.integrations.cloudinary.connected
-                    ? `"${data.integrations.cloudinary.cloudName}" · via ${data.integrations.cloudinary.source === "panel" ? "panel settings" : "server .env"}`
-                    : data.integrations.cloudinary.message}
+                    ? `${data.integrations.cloudinary.cloudName || "Cloud account"} · managed via ${data.integrations.cloudinary.source === "panel" ? "panel settings" : "server configuration"}`
+                    : data.integrations.cloudinary.message || "Connect Cloudinary to enable image uploads."}
                 </div>
               </div>
-              <span className="ml-auto flex items-center gap-2">
+              <span className="flex items-center gap-3">
                 <StatusPill status={data.integrations.cloudinary} />
-                <span className="text-gold font-black">→</span>
+                <span aria-hidden="true" className="text-slate-400">→</span>
               </span>
             </Link>
           )}
 
-          <div className="grid lg:grid-cols-3 gap-4">
-            <div className="card p-5 lg:col-span-1">
-              <h3 className="font-bold text-[15px] mb-1">Designs per category</h3>
-              <p className="text-xs text-slate-500 mb-4">Where your catalog lives</p>
-              {Object.keys(data.perCategory || {}).length === 0 && (
-                <p className="text-sm text-slate-500 rounded-xl bg-[#faf8f2] border border-[#eee9da] p-3">No designs yet — publish your first one to see the split.</p>
-              )}
-              {Object.entries(data.perCategory || {}).map(([slug, n]: any) => (
-                <div key={slug} className="mb-3">
-                  <div className="flex justify-between text-xs font-semibold mb-1.5"><span className="font-mono">{slug}</span><span className="tabular-nums">{n}</span></div>
-                  <div className="h-2 rounded-full bg-[#f0ece0] overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-goldbright to-gold transition-all" style={{ width: `${Math.min(100, (n / Math.max(1, data.counts.designs)) * 100)}%` }} />
-                  </div>
+          <div className="grid gap-4 xl:grid-cols-5">
+            <section className="card p-5 sm:p-6 xl:col-span-2" aria-labelledby="category-breakdown">
+              <div className="mb-5">
+                <h2 id="category-breakdown" className="text-sm font-semibold text-slate-900">Designs by category</h2>
+                <p className="mt-1 text-xs text-slate-500">How your catalog is distributed</p>
+              </div>
+              {Object.keys(data.perCategory || {}).length === 0 ? (
+                <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">Your category breakdown will appear after you add designs.</p>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(data.perCategory || {}).map(([slug, count]) => (
+                    <div key={slug}>
+                      <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                        <span className="truncate font-medium text-slate-600">{slug}</span>
+                        <span className="shrink-0 font-semibold tabular-nums text-slate-800">{count.toLocaleString()}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-blue-600 transition-[width] duration-500" style={{ width: `${Math.min(100, Math.max(0, (count / Math.max(1, data.counts.designs)) * 100))}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            <div className="card p-5 lg:col-span-2">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="font-bold text-[15px]">Recently added</h3>
-                <Link href="/designs" className="text-xs font-bold text-[#8a6d00] hover:underline">View all →</Link>
-              </div>
-              <p className="text-xs text-slate-500 mb-4">Fresh from your catalog</p>
-              {(data.recent || []).length === 0 && (
-                <p className="text-sm text-slate-500 rounded-xl bg-[#faf8f2] border border-[#eee9da] p-3">Upload your first design — it appears on the Android app instantly.</p>
               )}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(data.recent || []).map((d: any) => (
-                  <Link key={d.id} href="/designs" className="group rounded-2xl overflow-hidden border border-[#eee9da] bg-white hover:shadow-soft hover:-translate-y-0.5 transition-all">
-                    <div className="overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {d.imageUrl
-                        ? <img src={d.imageUrl} alt={d.name} loading="lazy" className="h-24 w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        : <div className="h-24 bg-slate-100" />}
-                    </div>
-                    <div className="p-2.5">
-                      <div className="text-xs font-bold truncate">{d.name}</div>
-                      <div className="text-[11px] text-slate-500 truncate">{d.category} · {d.subcategory}</div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
+            </section>
 
-          <div className="card p-5 sm:p-6">
-            <h3 className="font-bold text-[15px] mb-2">⚡ How sync works</h3>
-            <ol className="text-[13px] text-slate-600 space-y-1.5 list-decimal ml-5 leading-relaxed">
-              <li>Upload images here → stored on <b>Cloudinary</b> (fast CDN URLs).</li>
-              <li>Save → written to <b>Firestore</b> with the exact fields the app reads.</li>
-              <li>The Android app observes Firestore in real time — no app update needed.</li>
-              <li>Contact numbers, hero banner, logo and rooms live in <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">settings/app</code>.</li>
-            </ol>
+            <section className="card p-5 sm:p-6 xl:col-span-3" aria-labelledby="recent-designs">
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <h2 id="recent-designs" className="text-sm font-semibold text-slate-900">Recently added</h2>
+                  <p className="mt-1 text-xs text-slate-500">The latest additions to your catalog</p>
+                </div>
+                <Link href="/designs" className="text-xs font-semibold text-blue-700 hover:text-blue-800">View library <span aria-hidden="true">→</span></Link>
+              </div>
+              {(data.recent || []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+                  <p className="text-sm font-medium text-slate-700">No designs yet</p>
+                  <p className="mt-1 text-xs text-slate-500">Upload your first design to bring your catalog to life.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {(data.recent || []).slice(0, 4).map((design) => (
+                    <Link key={design.id} href="/designs" className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-blue-200 hover:shadow-md">
+                      <div className="aspect-[4/3] overflow-hidden bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {design.imageUrl ? <img src={design.imageUrl} alt={design.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" /> : <div className="grid h-full place-items-center text-xs text-slate-400">No preview</div>}
+                      </div>
+                      <div className="p-2.5">
+                        <div className="truncate text-xs font-semibold text-slate-800">{design.name}</div>
+                        <div className="mt-1 truncate text-[10px] text-slate-500">{design.category} · {design.subcategory}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </div>
       )}
@@ -128,16 +174,32 @@ export default function DashboardPage() {
   );
 }
 
-function Stat({ label, sub, value, href, icon, alert }: any) {
+function Stat({ label, description, value, href, icon, alert }: {
+  label: string;
+  description: string;
+  value: number | string;
+  href: string;
+  icon: "image" | "layers" | "room" | "spark";
+  alert?: boolean;
+}) {
+  const symbols: Record<typeof icon, React.ReactNode> = {
+    image: <><rect x="3" y="3" width="18" height="18" rx="2.5" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></>,
+    layers: <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5" /></>,
+    room: <><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" /></>,
+    spark: <><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" /><path d="m19 16 .8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z" /></>
+  };
+
   return (
-    <Link href={href} className={`card card-hover p-5 ${alert ? "ring-2 ring-red-300" : ""}`}>
-      <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold/15 to-goldbright/10 border border-gold/25 grid place-items-center text-lg">{icon}</div>
-        {alert && <span className="pill bg-red-100 text-red-700">Action needed</span>}
+    <Link href={href} className={`card card-hover group p-4 sm:p-5 ${alert ? "border-amber-200" : ""}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`grid h-9 w-9 place-items-center rounded-xl ${alert ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"}`}>
+          <svg aria-hidden="true" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{symbols[icon]}</svg>
+        </span>
+        {alert && <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Action needed</span>}
       </div>
-      <div className="text-[26px] font-bold mt-2 tabular-nums tracking-tight">{typeof value === "number" ? value.toLocaleString() : value}</div>
-      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
-      {sub && <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>}
+      <div className={`mt-4 truncate text-2xl font-bold tracking-tight ${typeof value === "string" && value.length > 8 ? "text-lg" : ""} ${alert ? "text-amber-700" : "text-slate-900"}`}>{typeof value === "number" ? value.toLocaleString() : value}</div>
+      <div className="mt-1 text-xs font-semibold text-slate-700">{label}</div>
+      <div className="mt-1 truncate text-[11px] text-slate-500">{description}</div>
     </Link>
   );
 }

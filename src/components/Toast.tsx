@@ -12,7 +12,7 @@ export const useToast = () => useContext(ToastCtx);
 const STYLE: Record<ToastKind, string> = {
   success: "border-emerald-200 bg-emerald-50 text-emerald-900",
   error: "border-red-200 bg-red-50 text-red-900",
-  info: "border-[#e7e2d5] bg-white text-slate-800"
+  info: "border-slate-200 bg-white text-slate-800"
 };
 
 const ICON: Record<ToastKind, string> = { success: "✓", error: "⚠", info: "ℹ" };

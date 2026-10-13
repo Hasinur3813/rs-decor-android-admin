@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { Modal, PageHeader, StateView } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { api, uploadImage } from "@/lib/client";
+import Link from "next/link";
 
 type Design = any;
 const LIMITS = [12, 24, 48, 100];
@@ -30,7 +31,6 @@ export default function DesignsPage() {
   const [limit, setLimit] = useState(24);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [showUpload, setShowUpload] = useState(false);
   const [editing, setEditing] = useState<Design | null>(null);
   const [deleting, setDeleting] = useState<Design[] | null>(null);
   const [bulkAction, setBulkAction] = useState<"" | "publish" | "unpublish" | "delete">("");
@@ -126,14 +126,14 @@ export default function DesignsPage() {
   return (
     <Shell>
       <PageHeader title="Designs" subtitle={`${totals.all.toLocaleString()} total · ${totals.active.toLocaleString()} live · ${totals.hidden.toLocaleString()} hidden`}>
-        <button className="btn-ghost !py-2" onClick={() => { load(); toast("info", "Catalog reloaded."); }}>↻ Refresh</button>
-        <button className="btn-gold !py-2" onClick={() => setShowUpload(true)}>＋ Upload designs</button>
+        <button className="btn-ghost !py-2" onClick={() => { load(); toast("info", "Catalog reloaded."); }}>Refresh</button>
+        <Link href="/designs/upload" className="btn-gold !py-2">+ Upload designs</Link>
       </PageHeader>
 
       {/* Toolbar: search + filters + sort */}
       <div className="card p-3 mb-3">
         <div className="flex flex-wrap gap-2">
-          <input className="input !w-64" placeholder="🔍 Search name, category, room…" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <input className="input !w-64" placeholder="Search name, category, room..." value={q} onChange={(e) => { setQ(e.target.value); }} />
           <select className="input !w-48" value={fCat} onChange={(e) => { setFCat(e.target.value); setPage(1); }}>
             <option value="">All categories</option>
             {cats.map((c: any) => <option key={c.id} value={c.slug}>{c.name}</option>)}
@@ -150,10 +150,10 @@ export default function DesignsPage() {
           <select className="input !w-36" value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
-            <option value="name">Name A–Z</option>
+            <option value="name">Name A-Z</option>
           </select>
           {(q || fCat || fSub || fStatus !== "all" || sort !== "newest") && (
-            <button className="btn-ghost !py-2" onClick={resetFilters}>Clear ✕</button>
+            <button className="btn-ghost !py-2" onClick={resetFilters}>Clear</button>
           )}
         </div>
       </div>
@@ -165,23 +165,23 @@ export default function DesignsPage() {
           <button className="btn-ghost !py-1.5 !text-xs" onClick={async () => {
             setBulkAction("publish");
             setDeleting(rows.filter((r) => selected.has(r.id)));
-          }}>✓ Publish</button>
+          }}>Publish</button>
           <button className="btn-ghost !py-1.5 !text-xs" onClick={() => {
             setBulkAction("unpublish");
             setDeleting(rows.filter((r) => selected.has(r.id)));
-          }}>◌ Unpublish</button>
+          }}>Unpublish</button>
           <button className="btn-ghost !py-1.5 !text-xs hover:!border-red-400 hover:text-red-600" onClick={() => {
             setBulkAction("delete");
             setDeleting(rows.filter((r) => selected.has(r.id)));
-          }}>🗑 Delete</button>
-          <button className="text-xs font-bold text-slate-500 hover:text-obsidian ml-auto px-2" onClick={() => setSelected(new Set())}>Deselect all ✕</button>
+          }}>Delete</button>
+          <button className="text-xs font-bold text-slate-500 hover:text-obsidian ml-auto px-2" onClick={() => setSelected(new Set())}>Deselect all</button>
         </div>
       )}
 
       {error && (
         <div className="mb-3">
-          <StateView icon="🔌" tone="red" title="Couldn't load designs" hint={`${error} — please check your connection and try again.`}
-            action={<button className="btn-gold" onClick={load}>↻ Try again</button>} />
+          <StateView icon="!" tone="red" title="Couldn't load designs" hint={`${error} - please check your connection and try again.`}
+            action={<button className="btn-gold" onClick={load}>Try again</button>} />
         </div>
       )}
 
@@ -216,7 +216,7 @@ export default function DesignsPage() {
               {!loading && rows.map((d) => {
                 const live = d.isActive !== false;
                 return (
-                  <tr key={d.id} className={`hover:bg-[#faf8f2] transition ${selected.has(d.id) ? "!bg-gold/5" : ""}`}>
+                  <tr key={d.id} className={`transition hover:bg-slate-50 ${selected.has(d.id) ? "!bg-gold/5" : ""}`}>
                     <td><input type="checkbox" checked={selected.has(d.id)} onChange={() => {
                       const next = new Set(selected);
                       if (next.has(d.id)) next.delete(d.id); else next.add(d.id);
@@ -226,8 +226,8 @@ export default function DesignsPage() {
                       <div className="flex items-center gap-3 min-w-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {d.imageUrl
-                          ? <img src={d.imageUrl} alt="" loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-[#eee9da] shrink-0" />
-                          : <div className="w-14 h-14 rounded-xl bg-slate-100 grid place-items-center text-lg shrink-0">🖼️</div>}
+                          ? <img src={d.imageUrl} alt={d.name} loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0" />
+                          : <div className="w-14 h-14 rounded-xl bg-slate-100 grid place-items-center text-xs text-slate-400 shrink-0">No image</div>}
                         <div className="min-w-0">
                           <div className="font-bold truncate max-w-[260px]" title={d.name}>{d.name}</div>
                           <div className="text-[11px] text-slate-400 font-mono truncate">{d.id}</div>
@@ -242,7 +242,7 @@ export default function DesignsPage() {
                         onClick={() => togglePublish(d)}
                         className={`pill border transition ${live ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"}`}
                       >
-                        {live ? "● Live" : "◌ Hidden"}
+                        {live ? "Live" : "Hidden"}
                       </button>
                     </td>
                     <td className="text-right whitespace-nowrap">
@@ -256,38 +256,37 @@ export default function DesignsPage() {
           </table>
         </div>
         {!loading && rows.length === 0 && !error && (
-          <StateView icon="▦" tone="gold"
+          <StateView icon="+" tone="gold"
             title={total === 0 && !q && !fCat && !fSub ? "No designs yet" : "No designs match"}
             hint={total === 0 && !q && !fCat && !fSub
-              ? "Upload your first designs — they'll appear on the Android app instantly."
+              ? "Upload your first designs - they'll appear on the Android app instantly."
               : "Try a different search term, or clear your filters to see everything."}
             action={total === 0 && !q && !fCat && !fSub
-              ? <button className="btn-gold" onClick={() => setShowUpload(true)}>＋ Upload designs</button>
-              : <button className="btn-ghost" onClick={resetFilters}>Clear filters ✕</button>} />
+              ? <Link href="/designs/upload" className="btn-gold">+ Upload designs</Link>
+              : <button className="btn-ghost" onClick={resetFilters}>Clear filters</button>} />
         )}
 
         {/* Pagination footer */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-[#faf8f2] border-t border-[#e7e2d5]">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
           <span className="text-xs text-slate-500 font-semibold">
-            {total === 0 ? "0 results" : `Showing ${((page - 1) * limit) + 1}–${Math.min(page * limit, total)} of ${total.toLocaleString()}`}
+            {total === 0 ? "0 results" : `Showing ${((page - 1) * limit) + 1}-${Math.min(page * limit, total)} of ${total.toLocaleString()}`}
           </span>
           <select className="input !w-auto !py-1.5 !text-xs ml-1" value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}>
             {LIMITS.map((l) => <option key={l} value={l}>{l} / page</option>)}
           </select>
           <div className="ml-auto flex items-center gap-1">
-            <PageBtn label="‹" disabled={page <= 1} onClick={() => setPage(page - 1)} />
+            <PageBtn label="Previous" disabled={page <= 1} onClick={() => setPage(page - 1)} />
             {pages.map((p) => (
               <button key={p} onClick={() => setPage(p)}
-                className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-obsidian text-goldbright" : "bg-white border border-[#ddd6c4] hover:border-gold"}`}>
+                className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-blue-600 text-white" : "border border-slate-200 bg-white hover:border-blue-300"}`}>
                 {p}
               </button>
             ))}
-            <PageBtn label="›" disabled={page >= totalPages} onClick={() => setPage(page + 1)} />
+            <PageBtn label="Next" disabled={page >= totalPages} onClick={() => setPage(page + 1)} />
           </div>
         </div>
       </div>
 
-      {showUpload && <BulkUploader cats={cats} subs={subs} onClose={() => setShowUpload(false)} onDone={() => { load(); }} />}
       {editing && <EditDesign design={editing} cats={cats} subs={subs} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); toast("success", "Design updated."); await load(); }} />}
       {deleting && (
         <Modal title={bulkAction === "delete" ? `Delete ${deleting.length} design(s)?` : `${bulkAction === "publish" ? "Publish" : "Unpublish"} ${deleting.length} design(s)?`} onClose={() => { setDeleting(null); setBulkAction(""); }}>
@@ -297,12 +296,12 @@ export default function DesignsPage() {
               : <>These designs will become <b>{bulkAction === "publish" ? "visible" : "hidden"}</b> on the Android app immediately.</>}
           </p>
           {bulkAction === "delete" && deleting.length === 1 && (
-            <p className="text-sm font-bold mt-2">“{deleting[0].name}”</p>
+            <p className="mt-2 text-sm font-bold">"{deleting[0].name}"</p>
           )}
           <div className="flex gap-2 mt-5 justify-end">
             <button className="btn-ghost" onClick={() => { setDeleting(null); setBulkAction(""); }}>Cancel</button>
             <button className={bulkAction === "delete" ? "btn-danger" : "btn-gold"} disabled={busy} onClick={runBulk}>
-              {busy ? "Working…" : bulkAction === "delete" ? "Delete forever" : "Confirm"}
+              {busy ? "Working..." : bulkAction === "delete" ? "Delete forever" : "Confirm"}
             </button>
           </div>
         </Modal>
@@ -314,7 +313,7 @@ export default function DesignsPage() {
 function PageBtn({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
   return (
     <button disabled={disabled} onClick={onClick}
-      className="min-w-[32px] h-8 rounded-lg text-sm font-bold bg-white border border-[#ddd6c4] hover:border-gold disabled:opacity-40">
+      className="min-w-[32px] h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600 hover:border-blue-300 disabled:opacity-40">
       {label}
     </button>
   );
@@ -326,183 +325,6 @@ function pageWindow(page: number, totalPages: number): number[] {
   const to = Math.min(totalPages, from + 4);
   for (let p = from; p <= to; p++) out.push(p);
   return out;
-}
-
-/* ---------------- Upload studio (unchanged flow, toast feedback) ---------------- */
-
-type QueueItem = {
-  key: string;
-  file: File;
-  preview: string;
-  name: string;
-  categorySlug: string;
-  subcategorySlug: string;
-  pct: number;
-  status: "ready" | "uploading" | "saving" | "done" | "error";
-  message?: string;
-};
-
-function BulkUploader({ cats, subs, onClose, onDone }: { cats: any[]; subs: any[]; onClose: () => void; onDone: () => void }) {
-  const { toast } = useToast();
-  const [items, setItems] = useState<QueueItem[]>([]);
-  const [defCat, setDefCat] = useState(cats[0]?.slug || "");
-  const [defSub, setDefSub] = useState(subs.find((s: any) => s.slug !== "all")?.slug || subs[0]?.slug || "");
-  const [publishing, setPublishing] = useState(false);
-  const [drag, setDrag] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const done = items.filter((i) => i.status === "done").length;
-
-  function addFiles(files: FileList | File[] | null) {
-    if (!files) return;
-    const arr = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 30);
-    const mapped: QueueItem[] = arr.map((file, idx) => ({
-      key: `${Date.now()}-${idx}-${file.name}`,
-      file,
-      preview: URL.createObjectURL(file),
-      name: file.name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " "),
-      categorySlug: defCat,
-      subcategorySlug: defSub,
-      pct: 0,
-      status: "ready"
-    }));
-    setItems((prev) => [...prev, ...mapped]);
-  }
-
-  function patch(key: string, p: Partial<QueueItem>) {
-    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...p } : i)));
-  }
-
-  function catName(slug: string) {
-    return cats.find((c: any) => c.slug === slug)?.name || "";
-  }
-  function subName(slug: string) {
-    return subs.find((s: any) => s.slug === slug)?.name || "";
-  }
-
-  async function publishAll() {
-    const pending = items.filter((i) => i.status === "ready" || i.status === "error");
-    if (pending.length === 0) return;
-    if (!defCat && !pending[0]?.categorySlug) { toast("error", "Please select a category first (or add one in Categories)."); return; }
-    setPublishing(true);
-    let okCount = 0;
-    for (const item of pending) {
-      if (!item.categorySlug || !item.subcategorySlug) {
-        patch(item.key, { status: "error", message: "Pick category + room." });
-        continue;
-      }
-      if (!item.name.trim()) {
-        patch(item.key, { status: "error", message: "Name required." });
-        continue;
-      }
-      try {
-        patch(item.key, { status: "uploading", message: "Uploading to Cloudinary…" });
-        const up = await uploadImage(item.file, "designs", (pct) => patch(item.key, { pct }));
-        patch(item.key, { status: "saving", pct: 100, message: "Saving to Firestore…" });
-        await api("/api/designs", {
-          method: "POST",
-          body: JSON.stringify({
-            name: item.name.trim(),
-            category: catName(item.categorySlug),
-            categorySlug: item.categorySlug,
-            subcategory: subName(item.subcategorySlug),
-            subcategorySlug: item.subcategorySlug,
-            imageUrl: up.secure_url,
-            imagePublicId: up.public_id
-          })
-        });
-        patch(item.key, { status: "done", message: "Live ✓" });
-        okCount++;
-      } catch (e: any) {
-        patch(item.key, { status: "error", message: e.message || "Failed" });
-      }
-    }
-    setPublishing(false);
-    if (okCount > 0) {
-      toast("success", `${okCount} design(s) published — live on the app.`);
-      await onDone();
-    } else {
-      toast("error", "Nothing published. Please fix the highlighted rows.");
-    }
-  }
-
-  return (
-    <Modal title={`Upload studio — ${items.length} file(s), ${done} live`} onClose={onClose} wide>
-      <div className="grid sm:grid-cols-2 gap-3 mb-3">
-        <div>
-          <label className="label">Default category for new files</label>
-          <select className="input" value={defCat} onChange={(e) => { setDefCat(e.target.value); setItems((prev) => prev.map((i) => i.status === "ready" ? { ...i, categorySlug: e.target.value } : i)); }}>
-            <option value="">— select —</option>
-            {cats.map((c: any) => <option key={c.id} value={c.slug}>{c.name} ({c.nameEn})</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="label">Default room for new files</label>
-          <select className="input" value={defSub} onChange={(e) => { setDefSub(e.target.value); setItems((prev) => prev.map((i) => i.status === "ready" ? { ...i, subcategorySlug: e.target.value } : i)); }}>
-            <option value="">— select —</option>
-            {subs.map((s: any) => <option key={s.id} value={s.slug}>{s.name} ({s.nameEn})</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
-        onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition ${drag ? "border-gold bg-gold/10" : "border-[#ddd6c4] bg-[#faf8f2] hover:border-gold"}`}
-      >
-        <div className="text-3xl">☁️⬆️</div>
-        <div className="font-extrabold mt-1">Drop up to 30 images here, or click to browse</div>
-        <div className="text-xs text-slate-500">Each file becomes one design · JPG/PNG/WEBP · 12 MB max · uploads show live progress</div>
-      </div>
-      <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
-
-      {items.length > 0 && (
-        <div className="mt-4 space-y-3 max-h-[46vh] overflow-y-auto scroll-thin pr-1">
-          {items.map((it) => (
-            <div key={it.key} className="rounded-2xl border border-[#eee9da] p-3 flex gap-3 bg-white">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={it.preview} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
-              <div className="flex-1 min-w-0">
-                <input className="input !py-1.5 !text-[13px] font-semibold" value={it.name} onChange={(e) => patch(it.key, { name: e.target.value })} placeholder="Design name (Bangla)" />
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <select className="input !py-1.5 !text-xs" value={it.categorySlug} onChange={(e) => patch(it.key, { categorySlug: e.target.value })}>
-                    <option value="">Category…</option>
-                    {cats.map((c: any) => <option key={c.id} value={c.slug}>{c.name}</option>)}
-                  </select>
-                  <select className="input !py-1.5 !text-xs" value={it.subcategorySlug} onChange={(e) => patch(it.key, { subcategorySlug: e.target.value })}>
-                    <option value="">Room…</option>
-                    {subs.map((s: any) => <option key={s.id} value={s.slug}>{s.name}</option>)}
-                  </select>
-                </div>
-                {(it.status === "uploading" || it.status === "saving") && (
-                  <div className="mt-2">
-                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-goldbright to-gold transition-all" style={{ width: `${it.status === "saving" ? 100 : it.pct}%` }} />
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">{it.message} {it.status === "uploading" ? `${it.pct}%` : ""}</div>
-                  </div>
-                )}
-                {it.status === "done" && <div className="text-xs font-bold text-emerald-600 mt-1.5">✓ Live on the app</div>}
-                {it.status === "error" && <div className="text-xs font-bold text-red-600 mt-1.5">⚠ {it.message}</div>}
-              </div>
-              <button className="self-start text-slate-400 hover:text-red-600" onClick={() => setItems((prev) => prev.filter((x) => x.key !== it.key))}>✕</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 mt-4">
-        <div className="text-xs text-slate-500">{done}/{items.length} published</div>
-        <div className="ml-auto flex gap-2">
-          <button className="btn-ghost" onClick={onClose}>Close</button>
-          <button className="btn-gold" disabled={publishing || items.length === 0} onClick={publishAll}>
-            {publishing ? "Publishing…" : `Publish ${items.filter((i) => i.status !== "done").length} design(s)`}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
 }
 
 function EditDesign({ design, cats, subs, onClose, onSaved }: { design: any; cats: any[]; subs: any[]; onClose: () => void; onSaved: () => void }) {
@@ -524,7 +346,7 @@ function EditDesign({ design, cats, subs, onClose, onSaved }: { design: any; cat
     try {
       const up = await uploadImage(f, "designs", setReuploadPct);
       setForm((p) => ({ ...p, imageUrl: up.secure_url, imagePublicId: up.public_id }));
-      toast("success", "New photo uploaded — save to apply it.");
+      toast("success", "New photo uploaded - save to apply it.");
     } catch (e: any) {
       toast("error", e.message);
     } finally {
@@ -567,13 +389,13 @@ function EditDesign({ design, cats, subs, onClose, onSaved }: { design: any; cat
       <div className="space-y-3">
         <div>
           <label className="label">Photo (Cloudinary)</label>
-          <div className="rounded-2xl overflow-hidden border border-[#eee9da]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {form.imageUrl && <img src={form.imageUrl} alt="" className="w-full h-48 object-cover" />}
             {reuploadPct !== null && <div className="h-1.5 bg-slate-100"><div className="h-full bg-gold" style={{ width: `${reuploadPct}%` }} /></div>}
           </div>
           <label className="btn-ghost w-full mt-2 cursor-pointer">
-            {reuploadPct !== null ? `Uploading ${reuploadPct}%…` : "Replace photo"}
+            {reuploadPct !== null ? `Uploading ${reuploadPct}%...` : "Replace photo"}
             <input type="file" accept="image/*" className="hidden" onChange={(e) => replaceFile(e.target.files?.[0])} />
           </label>
         </div>
@@ -585,14 +407,14 @@ function EditDesign({ design, cats, subs, onClose, onSaved }: { design: any; cat
           <div>
             <label className="label">Category</label>
             <select className="input" value={form.categorySlug} onChange={(e) => setForm({ ...form, categorySlug: e.target.value })}>
-              <option value="">—</option>
+              <option value="">Select a category</option>
               {cats.map((c: any) => <option key={c.id} value={c.slug}>{c.name}</option>)}
             </select>
           </div>
           <div>
             <label className="label">Room</label>
             <select className="input" value={form.subcategorySlug} onChange={(e) => setForm({ ...form, subcategorySlug: e.target.value })}>
-              <option value="">—</option>
+              <option value="">Select a room</option>
               {subs.map((s: any) => <option key={s.id} value={s.slug}>{s.name}</option>)}
             </select>
           </div>
@@ -603,7 +425,7 @@ function EditDesign({ design, cats, subs, onClose, onSaved }: { design: any; cat
         </label>
         <div className="flex justify-end gap-2 pt-1">
           <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-gold" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save changes"}</button>
+          <button className="btn-gold" disabled={saving} onClick={save}>{saving ? "Saving..." : "Save changes"}</button>
         </div>
       </div>
     </Modal>

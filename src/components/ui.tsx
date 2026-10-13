@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { uploadImage } from "@/lib/client";
+import { IMAGE_ACCEPT } from "@/lib/helpers";
 
 /** Modern drag-and-drop single image uploader → Cloudinary via /api/upload */
 export function ImageUploader({
@@ -29,6 +30,7 @@ export function ImageUploader({
       setError(e.message || "Upload failed");
     } finally {
       setPct(null);
+      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
@@ -36,26 +38,35 @@ export function ImageUploader({
     <div>
       <div className="label">{label}</div>
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Upload ${label.toLowerCase()}`}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
         onDrop={(e) => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files?.[0]); }}
         onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed transition overflow-hidden ${drag ? "border-gold bg-gold/10" : "border-[#ddd6c4] bg-[#faf8f2] hover:border-gold"}`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        className={`cursor-pointer rounded-2xl border-2 border-dashed transition overflow-hidden ${drag ? "border-gold bg-blue-50" : "border-slate-200 bg-slate-50 hover:border-gold"}`}
       >
         {value ? (
           <div className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={value} alt="preview" className="w-full h-44 object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-[11px] text-white flex justify-between">
+            <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-[11px] text-white">
               <span>Click or drop to replace</span>
               {publicId && <span className="opacity-70">Cloudinary ✓</span>}
             </div>
           </div>
         ) : (
-          <div className="py-8 text-center px-4">
-            <div className="text-3xl mb-1">🖼️</div>
-            <div className="text-sm font-bold">Drop image here or click to browse</div>
-            <div className="text-xs text-slate-500 mt-1">JPG / PNG / WEBP / AVIF · max 12 MB · auto-optimized to Cloudinary</div>
+          <div className="px-4 py-8 text-center">
+            <div className="mb-3 inline-grid h-11 w-11 place-items-center rounded-xl bg-white text-blue-600 shadow-sm">↑</div>
+            <div className="text-sm font-bold text-slate-800">Drop image here or click to browse</div>
+            <div className="mt-1 text-xs text-slate-500">JPG / PNG / WEBP / AVIF · max 12 MB · auto-optimized to Cloudinary</div>
           </div>
         )}
         {pct !== null && (
@@ -64,7 +75,7 @@ export function ImageUploader({
           </div>
         )}
       </div>
-      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden"
+      <input ref={inputRef} type="file" accept={IMAGE_ACCEPT} className="hidden"
         onChange={(e) => handle(e.target.files?.[0])} />
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
@@ -73,11 +84,11 @@ export function ImageUploader({
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className={`card w-full ${wide ? "max-w-3xl" : "max-w-lg"} max-h-[92vh] overflow-y-auto scroll-thin`} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#eee9da] sticky top-0 bg-white rounded-t-2xl">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`card w-full ${wide ? "max-w-3xl" : "max-w-lg"} max-h-[92vh] overflow-y-auto scroll-thin`} onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <h2 className="font-extrabold">{title}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">✕</button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -92,18 +103,18 @@ export function Empty({ icon, title, hint }: { icon: string; title: string; hint
 }
 
 export function StatusPill({ status }: { status: { connected?: boolean; configured?: boolean } }) {
-  if (status.connected) return <span className="pill bg-emerald-100 text-emerald-700">● Connected</span>;
-  if (status.configured) return <span className="pill bg-amber-100 text-amber-700">● Unreachable</span>;
-  return <span className="pill bg-red-100 text-red-700">● Not connected</span>;
+  if (status.connected) return <span className="pill border border-emerald-100 bg-emerald-50 text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Connected</span>;
+  if (status.configured) return <span className="pill border border-amber-100 bg-amber-50 text-amber-700"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Unreachable</span>;
+  return <span className="pill border border-red-100 bg-red-50 text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />Not connected</span>;
 }
 
 /** Consistent premium page header: title + subtitle + right-side actions. */
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start gap-3 mb-5">
+    <div className="mb-6 flex flex-wrap items-end gap-4">
       <div>
-        <h1 className="text-[22px] leading-tight font-bold tracking-tight">{title}</h1>
-        {subtitle && <p className="text-[13px] text-slate-500 mt-0.5">{subtitle}</p>}
+        <h1 className="text-[25px] font-bold leading-tight tracking-tight text-slate-900">{title}</h1>
+        {subtitle && <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-slate-500">{subtitle}</p>}
       </div>
       {children && <div className="ml-auto flex flex-wrap gap-2">{children}</div>}
     </div>
@@ -121,13 +132,13 @@ export function StateView({ icon, tone, title, hint, action, testId }: {
   action?: React.ReactNode; testId?: string;
 }) {
   const tones: Record<Tone, string> = {
-    gold: "bg-gradient-to-br from-gold/15 to-goldbright/10 text-[#8a6d00] border border-gold/25",
+    gold: "bg-blue-50 text-blue-600 border border-blue-100",
     red: "bg-red-50 text-red-500 border border-red-100",
     slate: "bg-slate-100 text-slate-400 border border-slate-200",
     green: "bg-emerald-50 text-emerald-500 border border-emerald-100"
   };
   return (
-    <div className="card p-10 sm:p-12 text-center" data-testid={testId}>
+    <div className="card p-10 text-center sm:p-12" data-testid={testId}>
       <div className={`state-blob ${tones[tone]}`}>{icon}</div>
       <div className="font-bold text-[17px] mt-4">{title}</div>
       {hint && <div className="text-sm text-slate-500 mt-1.5 max-w-md mx-auto leading-relaxed">{hint}</div>}

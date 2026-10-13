@@ -6,7 +6,7 @@ import { cloudinaryClient, uploadBufferToCloudinary, uploadFolder } from "@/lib/
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp", "avif", "heic", "heif", "jfif", "bmp", "tif", "tiff", "svg", "ico"];
 const MAX_BYTES = 12 * 1024 * 1024;
 
 /**
@@ -21,14 +21,32 @@ export async function POST(req: Request) {
     const kind = String(form.get("kind") || "designs");
     const publicId = form.get("publicId") ? String(form.get("publicId")) : undefined;
     if (!(file instanceof Blob)) return NextResponse.json({ error: "No file provided." }, { status: 400 });
+    if (file.size === 0) return NextResponse.json({ error: "That file is empty (0 bytes) — please pick another photo." }, { status: 400 });
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image too large (max 12 MB)." }, { status: 400 });
-    if (file.type && !ALLOWED.includes(file.type)) {
-      return NextResponse.json({ error: "Only JPG, PNG, WEBP, AVIF allowed." }, { status: 400 });
+    // Phones report unpredictable MIME types, so reject only files that are
+    // definitely not photos. Anything uncertain goes to Cloudinary, which
+    // validates the actual content (see catch below).
+    const fname = (file as File).name || "";
+    const dot = fname.lastIndexOf(".");
+    const ext = (dot >= 0 ? fname.slice(dot + 1) : "").toLowerCase();
+    const ftype = (file.type || "").toLowerCase();
+    const definitelyNotPhoto = ftype !== "" && !ftype.startsWith("image/") && !ALLOWED_EXTS.includes(ext);
+    if (definitelyNotPhoto) {
+      return NextResponse.json({ error: `“${fname || "That file"}” doesn't look like a photo. Please choose a JPG, PNG, WEBP, AVIF or HEIC image.` }, { status: 400 });
     }
     const buf = Buffer.from(await file.arrayBuffer());
     const folder = await uploadFolder(["designs", "categories", "hero", "logo"].includes(kind) ? kind : "designs");
-    const out = await uploadBufferToCloudinary(buf, { folder, publicId });
-    return NextResponse.json(out, { status: 201 });
+    try {
+      const out = await uploadBufferToCloudinary(buf, { folder, publicId });
+      return NextResponse.json(out, { status: 201 });
+    } catch (e) {
+      // Cloudinary inspected the bytes and refused them (corrupt download,
+      // unsupported format, DRM-wrapped file, …) — say so plainly.
+      return NextResponse.json(
+        { error: "The image host couldn't process this photo — it may be corrupt or an unsupported format. Try re-saving it as JPG and uploading again." },
+        { status: 400 }
+      );
+    }
   } catch (e) {
     const { status, message } = toErrorStatus(e);
     return NextResponse.json({ error: message }, { status });
