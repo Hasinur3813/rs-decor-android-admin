@@ -3,6 +3,7 @@ import { adminDb, serverTimestamp, toErrorStatus } from "@/lib/firebaseAdmin";
 import { requireSession } from "@/lib/requireSession";
 import { cloudinaryClient } from "@/lib/cloudinary";
 import { invalidateDesignsCache } from "@/lib/designsCache";
+import { buildDesignSearchTokens } from "@/lib/designSearch";
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -22,6 +23,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (patch.name && String(patch.name).trim().length < 2) {
       return NextResponse.json({ error: "Name min 2 chars." }, { status: 400 });
     }
+    patch.searchTokens = buildDesignSearchTokens(
+      patch.name ?? prev.name,
+      patch.category ?? prev.category,
+      patch.categorySlug ?? prev.categorySlug,
+      patch.subcategory ?? prev.subcategory,
+      patch.subcategorySlug ?? prev.subcategorySlug
+    );
     if (body.imagePublicId && prev.imagePublicId && body.imagePublicId !== prev.imagePublicId) {
       try { await (await cloudinaryClient()).uploader.destroy(prev.imagePublicId); } catch { /* ignore */ }
     }

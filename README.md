@@ -85,6 +85,18 @@ applied on the server. Every panel mutation invalidates the cache, so your
 own writes are visible immediately. Bulk publish/unpublish/delete handles
 up to 200 ids per call via `POST /api/designs/bulk`.
 
+The Android catalog uses Firestore cursor pages, category/room filters,
+indexed title search, and a server-side count for the active filters. Deploy
+the required indexes from this directory:
+
+```bash
+firebase deploy --only firestore:indexes --project YOUR_FIREBASE_PROJECT_ID
+```
+
+The admin Designs page automatically resumes the one-time token backfill for
+existing catalog rows. New uploads and edits receive search tokens in their
+normal write operation.
+
 ## Deploy
 
 Any Node host works (VPS, Render, Railway, Vercel). Set the same env vars on the

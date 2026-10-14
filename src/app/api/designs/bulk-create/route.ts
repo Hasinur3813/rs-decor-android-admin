@@ -3,6 +3,7 @@ import { adminDb, serverTimestamp, toErrorStatus } from "@/lib/firebaseAdmin";
 import { requireSession } from "@/lib/requireSession";
 import { invalidateDesignsCache } from "@/lib/designsCache";
 import { newId } from "@/lib/helpers";
+import { buildDesignSearchTokens } from "@/lib/designSearch";
 
 type Incoming = {
   name?: unknown; category?: unknown; categorySlug?: unknown;
@@ -41,6 +42,13 @@ export async function POST(req: Request) {
         subcategory: String(b.subcategory),
         subcategorySlug: String(b.subcategorySlug),
         imageUrl: String(b.imageUrl),
+        searchTokens: buildDesignSearchTokens(
+          name,
+          b.category,
+          b.categorySlug,
+          b.subcategory,
+          b.subcategorySlug
+        ),
         ...(b.imagePublicId ? { imagePublicId: String(b.imagePublicId) } : {}),
         isActive: b.isActive !== false,
         createdAt: serverTimestamp(),

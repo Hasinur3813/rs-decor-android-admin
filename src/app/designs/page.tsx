@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { Modal, PageHeader, StateView } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -40,6 +40,9 @@ export default function DesignsPage() {
   const [deleting, setDeleting] = useState<Design[] | null>(null);
   const [bulkAction, setBulkAction] = useState<"" | "publish" | "unpublish" | "delete">("");
   const [busy, setBusy] = useState(false);
+  const [searchIndexBusy, setSearchIndexBusy] = useState(false);
+  const [searchIndexProgress, setSearchIndexProgress] = useState(0);
+  const searchIndexStarted = useRef(false);
   const [statusUpdating, setStatusUpdating] = useState<Set<string>>(new Set());
 
   // Debounce search so 6000-row catalogs aren't queried per keystroke
@@ -142,12 +145,53 @@ export default function DesignsPage() {
     }
   }
 
+  const prepareAndroidSearch = useCallback(async () => {
+    if (searchIndexBusy) return;
+    setSearchIndexBusy(true);
+    setSearchIndexProgress(0);
+    let processed = 0;
+    let totalSearchable = 0;
+    try {
+      do {
+        const result: {
+          processed: number;
+          updated: number;
+          searchable: number;
+          totalProcessed: number;
+          totalSearchable: number;
+          hasMore: boolean;
+        } = await api("/api/designs/search-index", {
+          method: "POST",
+          body: JSON.stringify({ limit: 400 })
+        });
+        processed += result.processed || 0;
+        totalSearchable = result.totalSearchable || totalSearchable;
+        setSearchIndexProgress(result.totalProcessed || processed);
+        if (!result.hasMore) break;
+      } while (true);
+      if (processed > 0) {
+        toast("success", `Android search ready: ${totalSearchable.toLocaleString()} searchable designs indexed.`);
+      }
+    } catch (e: any) {
+      toast("error", `Search index stopped after ${processed.toLocaleString()} designs: ${e.message}`);
+    } finally {
+      setSearchIndexBusy(false);
+    }
+  }, [searchIndexBusy, toast]);
+
+  useEffect(() => {
+    if (searchIndexStarted.current) return;
+    searchIndexStarted.current = true;
+    void prepareAndroidSearch();
+  }, [prepareAndroidSearch]);
+
   const pages = pageWindow(page, totalPages);
 
   return (
     <Shell>
       <PageHeader title="Designs" subtitle={`${totals.all.toLocaleString()} total · ${totals.active.toLocaleString()} live · ${totals.hidden.toLocaleString()} hidden`}>
         <button className="btn-ghost !py-2" onClick={() => { load(); toast("info", "Catalog reloaded."); }}>Refresh</button>
+        {searchIndexBusy && <span className="text-xs text-[var(--muted)]">Preparing Android search index ({searchIndexProgress.toLocaleString()}…)</span>}
         <Link href="/designs/upload" className="btn-gold !py-2">+ Upload designs</Link>
       </PageHeader>
 

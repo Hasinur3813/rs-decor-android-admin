@@ -3,6 +3,7 @@ import { adminDb, serverTimestamp, toErrorStatus } from "@/lib/firebaseAdmin";
 import { requireSession } from "@/lib/requireSession";
 import { allDesigns, invalidateDesignsCache } from "@/lib/designsCache";
 import { newId } from "@/lib/helpers";
+import { buildDesignSearchTokens } from "@/lib/designSearch";
 
 export async function GET(req: Request) {
   try {
@@ -76,6 +77,13 @@ export async function POST(req: Request) {
       subcategory: String(body.subcategory),
       subcategorySlug: String(body.subcategorySlug),
       imageUrl: String(body.imageUrl),
+      searchTokens: buildDesignSearchTokens(
+        name,
+        body.category,
+        body.categorySlug,
+        body.subcategory,
+        body.subcategorySlug
+      ),
       isActive: body.isActive !== false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
