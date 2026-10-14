@@ -353,11 +353,20 @@ export default function DesignsPage() {
           <nav className="flex items-center justify-between gap-2 sm:ml-auto sm:justify-end" aria-label="Design table pages">
             <PageBtn label="Previous" disabled={page <= 1} onClick={() => setPage(page - 1)} />
             <div className="flex items-center gap-1">
-              {pages.map((entry, index) => entry === "ellipsis" ? (
-                <span key={`ellipsis-${index}`} aria-hidden="true" className="px-1.5 text-xs text-slate-400">…</span>
+              {pages.map((entry) => typeof entry === "object" ? (
+                <button
+                  key={`ellipsis-${entry.from}-${entry.to}`}
+                  type="button"
+                  title={`Jump to page ${entry.targetPage}`}
+                  aria-label={`Jump to page ${entry.targetPage}, skipping pages ${entry.from} to ${entry.to}`}
+                  onClick={() => setPage(entry.targetPage)}
+                  className="grid h-8 min-w-8 place-items-center rounded-lg px-1.5 text-xs font-semibold text-slate-400 transition hover:bg-white hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  …
+                </button>
               ) : (
                 <button key={entry} type="button" onClick={() => setPage(entry)} aria-label={`Go to page ${entry}`} aria-current={entry === page ? "page" : undefined}
-                  className={`grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs font-semibold transition ${entry === page ? "bg-blue-600 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"}`}>
+                  className={`grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${entry === page ? "bg-blue-600 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"}`}>
                   {entry}
                 </button>
               ))}
@@ -400,15 +409,22 @@ function PageBtn({ label, disabled, onClick }: { label: string; disabled: boolea
   );
 }
 
-function pageWindow(page: number, totalPages: number): Array<number | "ellipsis"> {
+type PageWindowEntry = number | { from: number; to: number; targetPage: number };
+
+function pageWindow(page: number, totalPages: number): PageWindowEntry[] {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
 
   const pages = new Set([1, totalPages, page, page - 1, page + 1]);
   const sorted = Array.from(pages).filter((value) => value >= 1 && value <= totalPages).sort((a, b) => a - b);
-  const out: Array<number | "ellipsis"> = [];
+  const out: PageWindowEntry[] = [];
 
   sorted.forEach((value, index) => {
-    if (index > 0 && value - sorted[index - 1] > 1) out.push("ellipsis");
+    if (index > 0 && value - sorted[index - 1] > 1) {
+      const from = sorted[index - 1] + 1;
+      const to = value - 1;
+      const targetPage = to < page ? Math.max(from, page - 5) : Math.min(to, page + 5);
+      out.push({ from, to, targetPage });
+    }
     out.push(value);
   });
   return out;
