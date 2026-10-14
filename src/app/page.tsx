@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Shell } from "@/components/Shell";
 import { PageHeader, SkeletonStats, StateView, StatusPill } from "@/components/ui";
@@ -34,11 +35,12 @@ type DashboardData = {
 };
 
 export default function DashboardPage() {
+  const { status } = useSession();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -48,9 +50,12 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (status === "authenticated") void load();
+    else if (status === "unauthenticated") setLoading(false);
+  }, [status, load]);
 
   return (
     <Shell>
